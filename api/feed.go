@@ -1,13 +1,11 @@
-package main
+package handler
 
 import (
 	"github.com/gorilla/feeds"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
-	"hawx.me/code/serve"
 
 	"errors"
-	"flag"
 	"log"
 	"net/http"
 	"path"
@@ -128,38 +126,28 @@ func htmlText(node *html.Node) string {
 	return strings.TrimSpace(strings.Join(parts, " "))
 }
 
-func main() {
-	var (
-		port   = flag.String("port", "8080", "")
-		socket = flag.String("socket", "", "")
-	)
-	flag.Parse()
+var client = &tinyletterClient{
+	baseURL: "http://tinyletter.com",
+	http:    http.DefaultClient,
+}
 
-	client := &tinyletterClient{
-		baseURL: "http://tinyletter.com",
-		http:    http.DefaultClient,
+func Handler(w http.ResponseWriter, r *http.Request) {
+	letters, err := client.get(r.URL.Path)
+	if err != nil {
+		if err.Error() == "404 Not Found" {
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			log.Println(err)
+			w.WriteHeader(http.StatusBadGateway)
+		}
+		return
 	}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		letters, err := client.get(r.URL.Path)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, "", http.StatusBadGateway)
-			return
-		}
-
-		w.Header().Add("Content-Type", "application/rss+xml")
-		err = letters.WriteRss(w)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, "", http.StatusInternalServerError)
-			return
-		}
-	})
-
-	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "http://tinyletter.com/favicon.ico", 301)
-	})
-
-	serve.Serve(*port, *socket, http.DefaultServeMux)
+	w.Header().Add("Content-Type", "application/rss+xml")
+	err = letters.WriteRss(w)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }

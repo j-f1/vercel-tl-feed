@@ -1,0 +1,6 @@
+{
+  "routes": [
+    { "src": "/favicon.ico", "dest": "https://tinyletter.com/favicon.ico" },
+    { "src": "/.+", "status": 200, "dest": "/api/feed" }
+  ]
+}
